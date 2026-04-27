@@ -323,7 +323,11 @@ Password: <output of previous command>
 
 Once ArgoCD is deployed, you can access the web interface:
 
+<<<<<<< HEAD
 <img width="1912" height="850" alt="image" src="https://github.com/user-attachments/assets/fee20025-4d63-4f16-aae7-80865ba3b475" />
+=======
+<img width="1912" height="850" alt="image" src="https://github.com/user-attachments/assets/e64d9a49-95bc-4dd0-9fd8-2298fb2e32f0" />
+>>>>>>> dbe6e1a (Replace local image with external ArgoCD UI link)
 
 
 The ArgoCD UI provides:
