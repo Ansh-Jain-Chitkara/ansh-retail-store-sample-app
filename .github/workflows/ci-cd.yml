@@ -1,0 +1,349 @@
+# CI/CD Pipeline
+#
+# Purpose:
+#   - Detects which of the five retail store microservices (ui, cart, catalog,
+#     checkout, orders) have changed on a push to the `gitops` branch.
+#   - Builds Docker images for changed services and pushes them to a private
+#     AWS ECR registry, tagged with the short Git SHA and `latest`.
+#   - Updates each changed service's Helm chart values.yaml with the new
+#     private ECR repository URI and short Git SHA tag.
+#   - Commits the updated values.yaml files back to the `gitops` branch so
+#     that ArgoCD can detect the drift and trigger a rolling update.
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [gitops]
+  workflow_dispatch:
+
+jobs:
+
+  detect-changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      ui:       ${{ steps.filter.outputs.ui }}
+      cart:     ${{ steps.filter.outputs.cart }}
+      catalog:  ${{ steps.filter.outputs.catalog }}
+      checkout: ${{ steps.filter.outputs.checkout }}
+      orders:   ${{ steps.filter.outputs.orders }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set all services changed (workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        id: filter
+        run: |
+          echo "ui=true"       >> $GITHUB_OUTPUT
+          echo "cart=true"     >> $GITHUB_OUTPUT
+          echo "catalog=true"  >> $GITHUB_OUTPUT
+          echo "checkout=true" >> $GITHUB_OUTPUT
+          echo "orders=true"   >> $GITHUB_OUTPUT
+
+      - name: Detect changed services
+        if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ui:
+              - 'src/ui/**'
+            cart:
+              - 'src/cart/**'
+            catalog:
+              - 'src/catalog/**'
+            checkout:
+              - 'src/checkout/**'
+            orders:
+              - 'src/orders/**'
+
+      - name: Print detected changes
+        run: |
+          echo "ui changed: ${{ steps.filter.outputs.ui }}"
+          echo "cart changed: ${{ steps.filter.outputs.cart }}"
+          echo "catalog changed: ${{ steps.filter.outputs.catalog }}"
+          echo "checkout changed: ${{ steps.filter.outputs.checkout }}"
+          echo "orders changed: ${{ steps.filter.outputs.orders }}"
+
+  build-ui:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.ui == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set SHORT_SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names retail-store-ui 2>/dev/null || \
+          aws ecr create-repository \
+            --repository-name retail-store-ui \
+            --image-scanning-configuration scanOnPush=true
+
+      - name: Log in to ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+          docker login --username AWS --password-stdin \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/retail-store-ui
+          docker build -t ${IMAGE_URI}:${SHORT_SHA} -t ${IMAGE_URI}:latest src/ui/
+          docker push ${IMAGE_URI}:${SHORT_SHA}
+          docker push ${IMAGE_URI}:latest
+          echo "Pushed: ${IMAGE_URI}:${SHORT_SHA}"
+          echo "Pushed: ${IMAGE_URI}:latest"
+
+  build-cart:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.cart == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set SHORT_SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names retail-store-cart 2>/dev/null || \
+          aws ecr create-repository \
+            --repository-name retail-store-cart \
+            --image-scanning-configuration scanOnPush=true
+
+      - name: Log in to ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+          docker login --username AWS --password-stdin \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/retail-store-cart
+          docker build -t ${IMAGE_URI}:${SHORT_SHA} -t ${IMAGE_URI}:latest src/cart/
+          docker push ${IMAGE_URI}:${SHORT_SHA}
+          docker push ${IMAGE_URI}:latest
+          echo "Pushed: ${IMAGE_URI}:${SHORT_SHA}"
+          echo "Pushed: ${IMAGE_URI}:latest"
+
+  build-catalog:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.catalog == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set SHORT_SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names retail-store-catalog 2>/dev/null || \
+          aws ecr create-repository \
+            --repository-name retail-store-catalog \
+            --image-scanning-configuration scanOnPush=true
+
+      - name: Log in to ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+          docker login --username AWS --password-stdin \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/retail-store-catalog
+          docker build -t ${IMAGE_URI}:${SHORT_SHA} -t ${IMAGE_URI}:latest src/catalog/
+          docker push ${IMAGE_URI}:${SHORT_SHA}
+          docker push ${IMAGE_URI}:latest
+          echo "Pushed: ${IMAGE_URI}:${SHORT_SHA}"
+          echo "Pushed: ${IMAGE_URI}:latest"
+
+  build-checkout:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.checkout == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set SHORT_SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names retail-store-checkout 2>/dev/null || \
+          aws ecr create-repository \
+            --repository-name retail-store-checkout \
+            --image-scanning-configuration scanOnPush=true
+
+      - name: Log in to ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+          docker login --username AWS --password-stdin \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/retail-store-checkout
+          docker build -t ${IMAGE_URI}:${SHORT_SHA} -t ${IMAGE_URI}:latest src/checkout/
+          docker push ${IMAGE_URI}:${SHORT_SHA}
+          docker push ${IMAGE_URI}:latest
+          echo "Pushed: ${IMAGE_URI}:${SHORT_SHA}"
+          echo "Pushed: ${IMAGE_URI}:latest"
+
+  build-orders:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.orders == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set SHORT_SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names retail-store-orders 2>/dev/null || \
+          aws ecr create-repository \
+            --repository-name retail-store-orders \
+            --image-scanning-configuration scanOnPush=true
+
+      - name: Log in to ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+          docker login --username AWS --password-stdin \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/retail-store-orders
+          docker build -t ${IMAGE_URI}:${SHORT_SHA} -t ${IMAGE_URI}:latest src/orders/
+          docker push ${IMAGE_URI}:${SHORT_SHA}
+          docker push ${IMAGE_URI}:latest
+          echo "Pushed: ${IMAGE_URI}:${SHORT_SHA}"
+          echo "Pushed: ${IMAGE_URI}:latest"
+
+  update-helm:
+    needs: [build-ui, build-cart, build-catalog, build-checkout, build-orders]
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set SHORT_SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Install yq
+        run: |
+          wget -qO /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          chmod +x /usr/local/bin/yq
+
+      - name: Update Helm values for changed services
+        run: |
+          chmod +x scripts/update-helm-values.sh
+          SERVICES_UPDATED=""
+          for SERVICE in ui cart catalog checkout orders; do
+            BUILD_RESULT=$(echo '${{ toJSON(needs) }}' | \
+              jq -r ".\"build-${SERVICE}\".result // \"skipped\"")
+            if [ "$BUILD_RESULT" = "success" ]; then
+              bash scripts/update-helm-values.sh \
+                "${SERVICE}" \
+                "${SHORT_SHA}" \
+                "${{ secrets.AWS_ACCOUNT_ID }}" \
+                "${{ secrets.AWS_REGION }}"
+              SERVICES_UPDATED="${SERVICES_UPDATED} ${SERVICE}"
+            else
+              echo "Skipping Helm update for ${SERVICE} (build result: ${BUILD_RESULT})"
+            fi
+          done
+          echo "SERVICES_UPDATED=${SERVICES_UPDATED}" >> $GITHUB_ENV
+
+      - name: Commit and push Helm chart changes
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/*/chart/values.yaml
+          if git diff --cached --quiet; then
+            echo "No changes to commit — all services were unchanged or skipped"
+            exit 0
+          fi
+          git commit -m "ci: update image tags for${SERVICES_UPDATED} to ${SHORT_SHA}"
+          git push origin gitops || (git pull --rebase origin gitops && git push origin gitops)
+          echo "Committed and pushed Helm chart updates for:${SERVICES_UPDATED}"
