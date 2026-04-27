@@ -24,11 +24,11 @@ jobs:
     permissions:
       contents: read
     outputs:
-      ui:       ${{ steps.filter.outputs.ui }}
-      cart:     ${{ steps.filter.outputs.cart }}
-      catalog:  ${{ steps.filter.outputs.catalog }}
-      checkout: ${{ steps.filter.outputs.checkout }}
-      orders:   ${{ steps.filter.outputs.orders }}
+      ui:       ${{ steps.manual.outputs.ui       || steps.paths.outputs.ui }}
+      cart:     ${{ steps.manual.outputs.cart     || steps.paths.outputs.cart }}
+      catalog:  ${{ steps.manual.outputs.catalog  || steps.paths.outputs.catalog }}
+      checkout: ${{ steps.manual.outputs.checkout || steps.paths.outputs.checkout }}
+      orders:   ${{ steps.manual.outputs.orders   || steps.paths.outputs.orders }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,7 +36,7 @@ jobs:
 
       - name: Set all services changed (workflow_dispatch)
         if: github.event_name == 'workflow_dispatch'
-        id: filter
+        id: manual
         run: |
           echo "ui=true"       >> $GITHUB_OUTPUT
           echo "cart=true"     >> $GITHUB_OUTPUT
@@ -47,7 +47,7 @@ jobs:
       - name: Detect changed services
         if: github.event_name != 'workflow_dispatch'
         uses: dorny/paths-filter@v3
-        id: filter
+        id: paths
         with:
           filters: |
             ui:
@@ -63,11 +63,11 @@ jobs:
 
       - name: Print detected changes
         run: |
-          echo "ui changed: ${{ steps.filter.outputs.ui }}"
-          echo "cart changed: ${{ steps.filter.outputs.cart }}"
-          echo "catalog changed: ${{ steps.filter.outputs.catalog }}"
-          echo "checkout changed: ${{ steps.filter.outputs.checkout }}"
-          echo "orders changed: ${{ steps.filter.outputs.orders }}"
+          echo "ui changed: ${{ steps.manual.outputs.ui || steps.paths.outputs.ui }}"
+          echo "cart changed: ${{ steps.manual.outputs.cart || steps.paths.outputs.cart }}"
+          echo "catalog changed: ${{ steps.manual.outputs.catalog || steps.paths.outputs.catalog }}"
+          echo "checkout changed: ${{ steps.manual.outputs.checkout || steps.paths.outputs.checkout }}"
+          echo "orders changed: ${{ steps.manual.outputs.orders || steps.paths.outputs.orders }}"
 
   build-ui:
     needs: detect-changes
