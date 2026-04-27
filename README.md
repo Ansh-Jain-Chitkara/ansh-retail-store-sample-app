@@ -323,7 +323,8 @@ Password: <output of previous command>
 
 Once ArgoCD is deployed, you can access the web interface:
 
-![ArgoCD UI Dashboard](./docs/images/argocd-ui.png)
+<img width="1912" height="850" alt="image" src="https://github.com/user-attachments/assets/fee20025-4d63-4f16-aae7-80865ba3b475" />
+
 
 The ArgoCD UI provides:
 - **Application Status**: Real-time sync status of all services
