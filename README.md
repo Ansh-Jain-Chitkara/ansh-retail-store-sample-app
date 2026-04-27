@@ -267,8 +267,8 @@ For GitHub Actions, first configure secrets so the pipelines can be automaticall
 GitHub Actions will automatically build and push the updated Docker images to Amazon ECR.
 
 
+<img width="1896" height="808" alt="image" src="https://github.com/user-attachments/assets/bd573cd6-9bad-4317-b750-ce09da376e76" />
 
-<img width="2868" height="1130" alt="image" src="https://github.com/user-attachments/assets/f29c3416-d630-4463-81d2-aaa8af9a02da" />
 
 
 ### Verify Deployment
