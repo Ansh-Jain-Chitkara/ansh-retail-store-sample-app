@@ -7,14 +7,21 @@ FROM public.ecr.aws/amazonlinux/amazonlinux:2023 AS build-env
 RUN dnf --setopt=install_weak_deps=False install -q -y \
     git \
     golang \
+    tar \
+    gzip \
     && \
     dnf clean all
+
+# Install the required Go toolchain version from go.mod (go1.24.4)
+RUN curl -fsSL https://go.dev/dl/go1.24.4.linux-amd64.tar.gz | tar -C /usr/local -xz
+ENV PATH="/usr/local/go/bin:${PATH}"
 
 RUN mkdir -p "${GOPATH}/src" "${GOPATH}/bin" /appsrc
 
 WORKDIR /appsrc
 
-ENV GOPROXY=https://goproxy.io,direct
+ENV GOPROXY=https://proxy.golang.org,direct
+ENV GONOSUMCHECK=*
 
 COPY go.mod go.sum ./
 RUN go mod download
