@@ -363,6 +363,8 @@ Open http://localhost:9090.
 > All five retail store services expose metrics at /actuator/prometheus (Java services) and /metrics (Go service). Prometheus discovers them automatically via pod annotations already set in each service's values.yaml.
 > To view per-pod CPU, memory, and network metrics, navigate to Dashboards → Browse → Kubernetes / Compute Resources / Namespace (Pods) in Grafana and set the namespace filter to retail-store.
 
+<img width="1918" height="1078" alt="image" src="https://github.com/user-attachments/assets/6ecb56c6-5480-4f1b-9527-16a5ef9fd90f" />
+
 ### Step 13: Cleanup
 To delete all resources created by Terraform:
 ```
