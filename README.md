@@ -289,7 +289,8 @@ kubectl get svc -n ingress-nginx
 
 Use the EXTERNAL-IP of the ingress-nginx-controller service to access the application.
 
-<img width="2912" height="1756" alt="image" src="https://github.com/user-attachments/assets/095077d6-d3cb-48f6-b021-e977db5fb242" />
+<img width="1892" height="958" alt="image" src="https://github.com/user-attachments/assets/ff6e00c5-9e94-47ba-bdd4-8f31bc75f80c" />
+
 
 ### Step 8: Argo CD Automated Deployment:
 
@@ -323,7 +324,8 @@ Password: <output of previous command>
 
 Once ArgoCD is deployed, you can access the web interface:
 
-<img width="1912" height="850" alt="image" src="https://github.com/user-attachments/assets/e64d9a49-95bc-4dd0-9fd8-2298fb2e32f0" />
+<img width="1902" height="855" alt="image" src="https://github.com/user-attachments/assets/a9c96531-5b5e-4266-be68-f5b3f0d827f0" />
+
 
 
 The ArgoCD UI provides:
@@ -338,8 +340,30 @@ The ArgoCD UI provides:
 kubectl get pods -n retail-store
 kubectl get ingress -n retail-store
 ```
+### Step 12: Enable Monitoring (Prometheus + Grafana)
 
-### Step 12: Cleanup
+The monitoring stack is provisioned via Terraform using the `kube-prometheus-stack` Helm chart. It deploys Prometheus, Grafana, and Alertmanager into the `monitoring` namespace.
+To enable it, uncomment the monitoring block in `terraform/addons.tf` and apply:
+```
+terraform apply --auto-approve
+```
+Access Grafana:
+```
+kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 3000:80
+```
+Open http://localhost:3000 and log in with admin / admin.
+
+Access Prometheus:
+```
+kubectl port-forward svc/kube-prometheus-stack-prometheus -n monitoring 9090:9090
+```
+Open http://localhost:9090.
+
+> [!NOTE]
+> All five retail store services expose metrics at /actuator/prometheus (Java services) and /metrics (Go service). Prometheus discovers them automatically via pod annotations already set in each service's values.yaml.
+> To view per-pod CPU, memory, and network metrics, navigate to Dashboards → Browse → Kubernetes / Compute Resources / Namespace (Pods) in Grafana and set the namespace filter to retail-store.
+
+### Step 13: Cleanup
 To delete all resources created by Terraform:
 ```
 terraform destroy --auto-approve
